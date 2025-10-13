@@ -1,36 +1,87 @@
 package tests
 
 import (
+	"context"
 	"database/sql"
-	"fmt"
+	_ "github.com/mattn/go-sqlite3"
+	"log/slog"
+	"os"
+	"testing"
+	"tinyurl/internal/repository"
+	"tinyurl/internal/service/link"
+	"tinyurl/internal/storage/sqlite"
+	sqliteRepo "tinyurl/internal/storage/sqlite/repository"
 )
 
-// go:coverage ignore
-func initTestDB() (*sql.DB, error) {
-	db, err := sql.Open("sqlite", "file:test.db?mode=memory&cache=shared")
+type TestDeps struct {
+	Svc *link.Service
+	Rep repository.LinkRepository
+	Log *slog.Logger
+	DB  *sql.DB
+}
+
+func NewTestDeps(t *testing.T) *TestDeps {
+	db, err := setupTestDB()
 	if err != nil {
-		return nil, fmt.Errorf("failed to open database: %w", err)
+		t.Fatalf("failed to setup test DB: %v", err)
 	}
 
-	_, err = db.Exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA foreign_keys=ON;`)
+	repo := sqliteRepo.NewLinkRepo(db)
+	service := link.New(repo)
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+
+	t.Cleanup(func() {
+		db.Close()
+		os.Remove("test.db")
+		os.Remove("test.db-shm")
+		os.Remove("test.db-wal")
+	})
+
+	return &TestDeps{
+		Svc: service,
+		Rep: repo,
+		Log: logger,
+		DB:  db,
+	}
+}
+
+func setupTestDB() (*sql.DB, error) {
+	os.Remove("test.db")
+	os.Remove("test.db-shm")
+	os.Remove("test.db-wal")
+
+	db, err := sql.Open("sqlite3", "test.db")
 	if err != nil {
-		return nil, fmt.Errorf("failed to configure SQLite: %w", err)
+		return nil, err
 	}
 
-	_, err = db.Exec(`
-	CREATE TABLE IF NOT EXISTS links (
-	  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-	  code        TEXT    NOT NULL UNIQUE,
-	  url         TEXT    NOT NULL,
-	  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	  expires_at  TIMESTAMP NULL,
-	  hit_count   INTEGER NOT NULL DEFAULT 0
-	);
-	CREATE INDEX IF NOT EXISTS idx_links_expires_at ON links (expires_at);
-	`)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create schema: %w", err)
+	ctx := context.Background()
+	if err := sqlite.Migrate(ctx, db); err != nil {
+		db.Close()
+		return nil, err
 	}
 
 	return db, nil
+}
+
+func setupTestService() (*link.Service, func(), error) {
+	db, err := setupTestDB()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	repo := sqliteRepo.NewLinkRepo(db)
+	service := link.New(repo)
+
+	cleanup := func() {
+		db.Close()
+		os.Remove("test.db")
+		os.Remove("test.db-shm")
+		os.Remove("test.db-wal")
+	}
+
+	return service, cleanup, nil
 }

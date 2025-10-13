@@ -1,15 +1,25 @@
-version: '3'
-
 services:
-  tinyurl:
+  migrate:
+    build:
+      context: .
+      dockerfile: ./cmd/migrate/Dockerfile
+    volumes:
+      - ./data:/data
+    environment:
+      - DATABASE_DSN=file:/data/tinyurl.db?_journal_mode=WAL&_busy_timeout=5000
+    command: ["up"]
+
+  server:
     build: .
     ports:
       - "8080:8080"
     volumes:
-      - tinyurl-data:/data
+      - ./data:/data
     environment:
-      - TINYURL_DB_PATH=file:/data/tinyurl.db?cache=shared&mode=rwc&_fk=1
-    restart: unless-stopped
-
-volumes:
-  tinyurl-data:
+      - DATABASE_DSN=file:/data/tinyurl.db?_journal_mode=WAL&_busy_timeout=5000
+      - HTTP_ADDRESS=:8080
+      - BASE_URL=http://localhost:8080
+      - LOG_LEVEL=info
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
