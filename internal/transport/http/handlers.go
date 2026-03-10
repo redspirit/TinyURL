@@ -71,7 +71,16 @@ func (h *Handlers) Shorten(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "only one JSON object allowed", http.StatusBadRequest)
 		return
 	}
-	code, expiresAt, err := h.svc.Shorten(r.Context(), req.URL, req.Alias, req.TTLDays)
+
+	codeLen := req.CodeLen
+	if codeLen == 0 {
+		codeLen = 6
+	} else if codeLen < 2 || codeLen > 10 {
+		http.Error(w, "code_len must be between 2 and 10", http.StatusBadRequest)
+		return
+	}
+
+	code, expiresAt, err := h.svc.Shorten(r.Context(), req.URL, req.Alias, req.TTLDays, codeLen)
 	if err != nil {
 		switch {
 		case errors.Is(err, link.ErrAliasBusy):

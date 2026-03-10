@@ -12,7 +12,7 @@ func TestShorten_And_Resolve(t *testing.T) {
 	d := NewTestDeps(t)
 	ctx := context.Background()
 
-	code, _, err := d.Svc.Shorten(ctx, "https://example.com", "", 0)
+	code, _, err := d.Svc.Shorten(ctx, "https://example.com", "", 0, 6)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func TestShorten_WithAlias(t *testing.T) {
 	d := NewTestDeps(t)
 	ctx := context.Background()
 
-	code, _, err := d.Svc.Shorten(ctx, "https://golang.org", "go", 0)
+	code, _, err := d.Svc.Shorten(ctx, "https://golang.org", "go", 0, 6)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func TestShorten_WithAlias(t *testing.T) {
 		t.Fatalf("alias mismatch: %s", code)
 	}
 
-	if _, _, err := d.Svc.Shorten(ctx, "https://golang.org/doc", "go", 0); err == nil {
+	if _, _, err := d.Svc.Shorten(ctx, "https://golang.org/doc", "go", 0, 6); err == nil {
 		t.Fatal("expected alias conflict, got nil")
 	}
 }

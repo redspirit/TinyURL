@@ -4,6 +4,7 @@ type ShortenRequest struct {
 	URL     string `json:"url"`
 	Alias   string `json:"alias,omitempty"`
 	TTLDays int    `json:"ttl_days,omitempty"`
+	CodeLen int    `json:"code_len,omitempty"`
 }
 
 type ShortenResponse struct {

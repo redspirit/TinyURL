@@ -25,7 +25,7 @@ func New(repo repository.LinkRepository) *Service {
 	return &Service{repo: repo}
 }
 
-func (s *Service) Shorten(ctx context.Context, url, alias string, ttlDays int) (string, *time.Time, error) {
+func (s *Service) Shorten(ctx context.Context, url, alias string, ttlDays, codeLen int) (string, *time.Time, error) {
 	url = strings.TrimSpace(url)
 	alias = strings.TrimSpace(alias)
 
@@ -47,15 +47,17 @@ func (s *Service) Shorten(ctx context.Context, url, alias string, ttlDays int) (
 		return s.withAlias(ctx, url, alias, expiresAt)
 	}
 
-	return s.withCode(ctx, url, expiresAt)
+	return s.withCode(ctx, url, expiresAt, codeLen)
 }
 
-func (s *Service) withCode(ctx context.Context, url string, expiresAt *time.Time) (string, *time.Time, error) {
+func (s *Service) withCode(ctx context.Context, url string, expiresAt *time.Time, codeLen int) (string, *time.Time, error) {
 	if existing, _ := s.repo.GetByURL(ctx, url); existing != nil && !isExpired(existing) {
-		return existing.Code, existing.ExpiresAt, nil
+		if len(existing.Code) == codeLen {
+			return existing.Code, existing.ExpiresAt, nil
+		}
 	}
 
-	code, err := s.generateCode(ctx)
+	code, err := s.generateCode(ctx, codeLen)
 	if err != nil {
 		return "", nil, err
 	}
@@ -108,9 +110,9 @@ func (s *Service) aliasAvailable(ctx context.Context, alias string) error {
 	return s.repo.SoftDelete(ctx, alias)
 }
 
-func (s *Service) generateCode(ctx context.Context) (string, error) {
-	for i := 0; i < 6; i++ {
-		cand := genCode(7 + i%2)
+func (s *Service) generateCode(ctx context.Context, codeLen int) (string, error) {
+	for i := 0; i < codeLen; i++ {
+		cand := genCode(codeLen)
 
 		got, _ := s.repo.GetByCode(ctx, cand)
 		if got == nil || isExpired(got) {
