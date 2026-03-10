@@ -5,6 +5,10 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 
+RUN apk add --no-cache gcc musl-dev
+
+ENV CGO_ENABLED=1
+
 RUN go build -o tinyurl-server ./cmd/server/
 
 RUN go build -o tinyurl-cli ./cmd/cli/
